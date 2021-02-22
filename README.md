@@ -16,9 +16,9 @@
 
 ### Example
 ```shell
-python background.py
+$ python background.py
 # Dataset in labelme format will be saved in the directory '''/train'''
 
-python labelme2coco.py train/ coco/ --labels labels.txt --ann train
+$ python labelme2coco.py train/ coco/ --labels labels.txt --ann train
 # Dataset in coco format can be found in the directory '''coco'''
 ```
