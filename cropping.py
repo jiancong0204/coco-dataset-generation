@@ -14,6 +14,8 @@ class Cropping:
         self.__roi_corners = None
         self.__ann_file = None
         self.__json_data = None
+        self.__mask_num = None
+
 
     def set_ann_file(self, ann_file):
         self.__ann_file = ann_file
@@ -30,7 +32,7 @@ class Cropping:
         cv2.fillPoly(mask, roi_corners, ignore_mask_color)
         return mask
 
-    def image_cropping(self):
+    def image_cropping(self, mask_num):
 
         # read json file
         json_data = self.__json_data
@@ -42,7 +44,7 @@ class Cropping:
         img = cv2.imread(image_name)
 
         # determine region of interest
-        self.__roi_corners = np.array(json_data["shapes"][0]["points"], dtype=np.int32)
+        self.__roi_corners = np.array(json_data["shapes"][mask_num]["points"], dtype=np.int32)
         size = int(self.__roi_corners.size / 2)
         self.__roi_corners = self.__roi_corners.reshape((1, size, 2))
 
@@ -50,8 +52,7 @@ class Cropping:
 
         self.__masked_image = cv2.bitwise_and(img, self.__mask)
 
-    def rotate(self):
-        rotation_angle = random.uniform(0, 360)  # Degree
+    def rotate(self, rotation_angle):
         height = self.__masked_image.shape[0]
         width = self.__masked_image.shape[1]
         rotation_mat = cv2.getRotationMatrix2D((width // 2, height // 2), rotation_angle, 1)
@@ -90,7 +91,8 @@ class Cropping:
 
 if __name__ == "__main__":
     c = Cropping()
-    c.set_ann_file('label/0001.json')
+    c.set_ann_file('label/0001.json', 0)
     c.image_cropping()
-    c.rotate()
+    rotation_angle = random.uniform(0, 360)  # Degree
+    c.rotate(rotation_angle)
     c.display_masked_image()
