@@ -3,6 +3,7 @@ import cv2
 import os
 import random
 import json
+import numpy as np
 
 
 class Background:
@@ -22,13 +23,16 @@ class Background:
         self.__mask_height = None
         self.__mask_width = None
         self.__mask_resize_coff = None
+        self.__json_len = None
+        self.__pre_roi_polygons = []
         self.res_height = 900
         self.res_width = 1200
 
     def prepare_cropping(self, ann_file):
+        self.__pre_roi_polygons = []
         self.c.set_ann_file(ann_file)
         self.json_label = self.c.get_json_data()
-
+        self.__json_len = len(self.json_label["shapes"])
 
     def cropping(self, mask_num):
         self.__mask_num = mask_num
@@ -52,11 +56,31 @@ class Background:
 
     def generate_rnd_coffs(self):
         self.__rotation_angle = random.uniform(0, 360)
-        self.__zoom_coff = random.uniform(1, 1.5)
+        self.__zoom_coff = random.uniform(1, 1.2)
         self.__translation_x = random.randint(0, 100)
         self.__translation_y = random.randint(0, 100)
 
-    def generate_res(self):
+    @staticmethod
+    def is_ray_intersects_segment(ray_point, start_point, end_point) -> bool:
+        if start_point[1] == end_point[1]:
+            return False
+        if start_point[1] > ray_point[1] and end_point[1] > ray_point[1]:
+            return False
+        if start_point[1] < ray_point[1] and end_point[1] < ray_point[1]:
+            return False
+        if start_point[1] == ray_point[1] and end_point[1] > ray_point[1]:
+            return True
+        if end_point[1] == ray_point[1] and start_point[1] > ray_point[1]:
+            return True
+        if start_point[0] < ray_point[0] and end_point[1] < ray_point[1]:
+            return False
+
+        intersection_x = end_point[0] - (end_point[0] - start_point[0]) * (end_point[1] - ray_point[1]) / (end_point[1] - start_point[1])  # 求交
+        if intersection_x < ray_point[0]:
+            return False
+        return True
+
+    def generate_res(self) -> bool:
         masked_img = self.__mask_img
 
         # random zoom
@@ -68,10 +92,52 @@ class Background:
 
         new_height = self.__res_img.shape[0]
         new_width = self.__res_img.shape[1]
+
         translation_y = (new_height - height) * self.__translation_y / 100
         translation_x = (new_width - width) * self.__translation_x / 100
         translation_y = int(translation_y)
         translation_x = int(translation_x)
+
+        roi_corners = self.c.get_roi_corners()
+
+        for i in range(len(roi_corners)):
+            real_x = roi_corners[i][0] // zoom_coff + translation_x
+            real_y = roi_corners[i][1] // zoom_coff + translation_y
+
+            if real_x <= new_width and real_y <= new_height:
+                roi_corners[i][0] = real_x
+                roi_corners[i][1] = real_y
+            else:
+                roi_corners[i][0] = new_width
+                roi_corners[i][1] = new_height
+
+        if len(self.__pre_roi_polygons) != 0:
+            for curr_point in roi_corners:
+                for pre_roi_corners in self.__pre_roi_polygons:
+                    cnt_intersection = 0
+                    for i in range(len(pre_roi_corners)):
+                        start = (float(pre_roi_corners[i][0]), float(pre_roi_corners[i][1]))
+                        next_i = (i + 1) % len(pre_roi_corners)
+                        end = (float(pre_roi_corners[next_i][0]), float(pre_roi_corners[next_i][1]))
+                        if self.is_ray_intersects_segment(curr_point, start, end):
+                            cnt_intersection += 1
+                    if cnt_intersection % 2 == 1:
+                        return False
+
+            for pre_roi_corners in self.__pre_roi_polygons:
+                for curr_point in pre_roi_corners:
+                    cnt_intersection = 0
+                    for i in range(len(roi_corners)):
+                        start = (float(roi_corners[i][0]), float(roi_corners[i][1]))
+                        next_i = (i + 1) % len(roi_corners)
+                        end = (float(roi_corners[next_i][0]), float(roi_corners[next_i][1]))
+                        if self.is_ray_intersects_segment(curr_point, start, end):
+                            cnt_intersection += 1
+
+                    if cnt_intersection % 2 == 1:
+                        return False
+
+        self.__pre_roi_polygons.append(roi_corners)
 
         for y in range(height):
             for x in range(width):
@@ -81,19 +147,8 @@ class Background:
                 if pixel.all() != 0:
                     self.__res_img[y + translation_y, x + translation_x] = pixel
 
-        roi_corners = self.c.get_roi_corners()
-
-        for i in range(len(roi_corners)):
-            real_x = roi_corners[i][0] // zoom_coff + translation_x
-            real_y = roi_corners[i][1] // zoom_coff + translation_y
-            if real_x <= new_width and real_y <= new_height:
-                roi_corners[i][0] = real_x
-                roi_corners[i][1] = real_y
-            else:
-                roi_corners[i][0] = new_width
-                roi_corners[i][1] = new_height
-
         self.json_label["shapes"][self.__mask_num]["points"] = roi_corners.tolist()
+        return True
 
     def get_res_img(self):
         return self.__res_img
@@ -115,16 +170,21 @@ if __name__ == "__main__":
         bg.prepare_cropping('label/0004.json')
         length = len(bg.json_label["shapes"])
         j = 0
+        cnt = 0
         while j < length:
             rnd = random.uniform(0, 1)
-            if rnd > 0.5:
+            if rnd > 0.7:
                 bg.json_label["shapes"].pop(j)
                 length -= 1
                 continue
             bg.generate_rnd_coffs()
             bg.cropping(j)
-            bg.generate_res()
+            if not bg.generate_res():
+                bg.json_label["shapes"].pop(j)
+                length -= 1
+                continue
             j += 1
+            cnt += 1
 
         # bg.display_res()
         res = bg.get_res_img()
@@ -139,4 +199,5 @@ if __name__ == "__main__":
         f2.write(b)
         f2.close()
         n += 1
+
     print('Done.')
