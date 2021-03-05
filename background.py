@@ -52,7 +52,7 @@ class Background:
 
     def generate_rnd_coffs(self):
         self.__rotation_angle = random.uniform(0, 360)
-        self.__zoom_coff = random.uniform(1, 2)
+        self.__zoom_coff = random.uniform(1, 1.5)
         self.__translation_x = random.randint(0, 100)
         self.__translation_y = random.randint(0, 100)
 
