@@ -18,6 +18,10 @@ class Background:
         self.__translation_x = None
         self.__translation_y = None
         self.__mask_num = None
+        self.__mask_img = None
+        self.__mask_height = None
+        self.__mask_width = None
+        self.__mask_resize_coff = None
         self.res_height = 900
         self.res_width = 1200
 
@@ -25,11 +29,21 @@ class Background:
         self.c.set_ann_file(ann_file)
         self.json_label = self.c.get_json_data()
 
+
     def cropping(self, mask_num):
         self.__mask_num = mask_num
 
         self.c.image_cropping(mask_num)
         self.c.rotate(self.__rotation_angle)
+        self.__mask_img = self.c.get_masked_image()
+        self.__mask_height = self.__mask_img.shape[0]
+        self.__mask_width = self.__mask_img.shape[1]
+        zoom_coff_x = self.__mask_width / self.res_width
+        zoom_coff_y = self.__mask_height / self.res_height
+        self.__mask_resize_coff = max(zoom_coff_x, zoom_coff_y)
+        self.__mask_height = int(self.__mask_img.shape[0] / self.__mask_resize_coff)
+        self.__mask_width = int(self.__mask_img.shape[1] / self.__mask_resize_coff)
+        self.__mask_img = cv2.resize(self.__mask_img, (self.__mask_width, self.__mask_height), interpolation=cv2.INTER_CUBIC)
 
     def read_bg(self, bg_file):
         self.__bg = cv2.imread(bg_file)
@@ -38,21 +52,18 @@ class Background:
 
     def generate_rnd_coffs(self):
         self.__rotation_angle = random.uniform(0, 360)
-        self.__zoom_coff = random.uniform(1, 1.1)
+        self.__zoom_coff = random.uniform(1, 1.2)
         self.__translation_x = random.randint(0, 100)
         self.__translation_y = random.randint(0, 100)
 
     def generate_res(self):
-        masked_img = self.c.get_masked_image()
-        height = masked_img.shape[0]
-        width = masked_img.shape[1]
-        zoom_coff_x = width / self.res_width
-        zoom_coff_y = height / self.res_height
-        # random zoom
-        zoom_coff = self.__zoom_coff * max(zoom_coff_x, zoom_coff_y)
+        masked_img = self.__mask_img
 
-        height = int(masked_img.shape[0] / zoom_coff)
-        width = int(masked_img.shape[1] / zoom_coff)
+        # random zoom
+        zoom_coff = self.__zoom_coff * self.__mask_resize_coff
+
+        height = int(masked_img.shape[0] / self.__zoom_coff)
+        width = int(masked_img.shape[1] / self.__zoom_coff)
         masked_img = cv2.resize(masked_img, (width, height), interpolation=cv2.INTER_CUBIC)
 
         new_height = self.__res_img.shape[0]
@@ -99,13 +110,22 @@ if __name__ == "__main__":
     n = 0
     print('Running...')
     for i in f:
-        bg.generate_rnd_coffs()
         name = path + f[n]
         bg.read_bg(name)
         bg.prepare_cropping('label/0004.json')
-        for j in range(len(bg.json_label["shapes"])):
+        length = len(bg.json_label["shapes"])
+        j = 0
+        while j < length:
+            rnd = random.uniform(0, 1)
+            if rnd > 0.5:
+                bg.json_label["shapes"].pop(j)
+                length -= 1
+                continue
+            bg.generate_rnd_coffs()
             bg.cropping(j)
             bg.generate_res()
+            j += 1
+
         # bg.display_res()
         res = bg.get_res_img()
         save_path = 'train/' + f[n]
