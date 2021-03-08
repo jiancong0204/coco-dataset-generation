@@ -67,6 +67,18 @@ class Cropping:
         self.__roi_corners = self.__roi_corners[0]
         self.__roi_corners = np.column_stack((self.__roi_corners, np.ones(self.__roi_corners.shape[0])))
         self.__roi_corners = np.dot(rotation_mat, self.__roi_corners.T).T
+        roi = np.array(self.__roi_corners)
+        max_x = int(max(roi[:, 0]))
+        max_y = int(max(roi[:, 1]))
+        min_x = int(min(roi[:, 0]))
+        min_y = int(min(roi[:, 1]))
+        # bbox = [[min_x, min_y], [max_x, max_y]]
+        type(self.__masked_image)
+        self.__masked_image = self.__masked_image[min_y:max_y + 1, min_x:max_x + 1]
+        self.__roi_corners[:, 0] -= min_x
+        self.__roi_corners[:, 1] -= min_y
+
+
 
     def display_masked_image(self):
         # show the mask
@@ -79,20 +91,14 @@ class Cropping:
     def get_roi_corners(self):
         return self.__roi_corners
 
-    def get_mask(self):
-        return self.__mask
-
-    def get_rot_corners(self):
-        return self.__roi_corners
-
     def get_json_data(self):
         return self.__json_data
 
 
 if __name__ == "__main__":
     c = Cropping()
-    c.set_ann_file('label/0001.json', 0)
-    c.image_cropping()
+    c.set_ann_file('label/0004.json')
+    c.image_cropping(0)
     rotation_angle = random.uniform(0, 360)  # Degree
     c.rotate(rotation_angle)
     c.display_masked_image()

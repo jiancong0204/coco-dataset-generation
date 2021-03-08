@@ -56,7 +56,7 @@ class Background:
 
     def generate_rnd_coffs(self):
         self.__rotation_angle = random.uniform(0, 360)
-        self.__zoom_coff = random.uniform(1, 1.2)
+        self.__zoom_coff = random.uniform(2, 6)
         self.__translation_x = random.randint(0, 100)
         self.__translation_y = random.randint(0, 100)
 
@@ -80,6 +80,7 @@ class Background:
             return False
         return True
 
+    @property
     def generate_res(self) -> bool:
         masked_img = self.__mask_img
 
@@ -112,6 +113,7 @@ class Background:
                 roi_corners[i][1] = new_height
 
         if len(self.__pre_roi_polygons) != 0:
+
             for curr_point in roi_corners:
                 for pre_roi_corners in self.__pre_roi_polygons:
                     cnt_intersection = 0
@@ -179,7 +181,7 @@ if __name__ == "__main__":
                 continue
             bg.generate_rnd_coffs()
             bg.cropping(j)
-            if not bg.generate_res():
+            if not bg.generate_res:
                 bg.json_label["shapes"].pop(j)
                 length -= 1
                 continue
