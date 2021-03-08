@@ -191,8 +191,10 @@ if __name__ == "__main__":
         # bg.display_res()
         res = bg.get_res_img()
         save_path = 'train/' + f[n]
+
         cv2.imwrite(save_path, res)
-        save_path = save_path.replace('jpg', 'json')
+        last_point = save_path.rfind('.')
+        save_path = save_path[:last_point] + '.json'
         bg.json_label["imagePath"] = f[n]
         bg.json_label["imageHeight"] = bg.res_height
         bg.json_label["imageWidth"] = bg.res_width
